@@ -21,18 +21,13 @@ class InsertTOC(BaseModel):
     after_block_id: str
 
 
-class SetFooterPageNumbers(BaseModel):
-    op: Literal["set_footer_page_numbers"]
-    enabled: bool
-
-
 class BoldSpan(BaseModel):
     op: Literal["bold_span"]
     block_id: str
     start: int
     end: int
     
-Operation = Annotated[Union[SetStyle, FindReplace, InsertTOC, SetFooterPageNumbers, BoldSpan], Field(discriminator="op")]
+Operation = Annotated[Union[SetStyle, FindReplace, InsertTOC, BoldSpan], Field(discriminator="op")]
 
 class OperationList(BaseModel):
     operations: list[Operation]

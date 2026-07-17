@@ -1,5 +1,5 @@
 from docx import Document
-from schema.operations import SetStyle, FindReplace, InsertTOC, SetFooterPageNumbers, BoldSpan
+from schema.operations import SetStyle, FindReplace, InsertTOC, BoldSpan
 
 
 class Executor:
@@ -13,8 +13,6 @@ class Executor:
             self._find_replace(op)
         elif isinstance(op, InsertTOC):
             self._insert_toc(op)
-        elif isinstance(op, SetFooterPageNumbers):
-            self._set_footer_page_numbers(op)
         elif isinstance(op, BoldSpan):
             self._bold_span(op)
         else:
@@ -23,3 +21,25 @@ class Executor:
     def _set_style(self, op: SetStyle):
         para = self.tree.blocks[op.block_id]
         para.style = op.target_style
+        
+    def _find_replace(self, op: FindReplace):
+        para = self.tree.blocks[op.block_id]
+        for run in para.runs:
+            if op.find in run.text:
+                run.text = run.text.replace(op.find, op.replace)
+                
+    def _insert_toc(self, op: InsertTOC):
+        para = self.tree.blocks[op.after_block_id]
+        new_para = para.insert_paragraph_before("Table of Contents (placeholder)")
+        new_para.style = self.tree.doc.styles["Heading 1"]
+
+    def _bold_span(self, op: BoldSpan):
+        para = self.tree.blocks[op.block_id]
+        full_text = "".join(run.text for run in para.runs)
+        target = full_text[op.start:op.end]
+        for run in para.runs:
+            run.text = ""
+        para.runs[0].text = full_text[:op.start]
+        b = para.add_run(target)
+        b.bold = True
+        para.add_run(full_text[op.end:])
