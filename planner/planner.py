@@ -23,8 +23,9 @@ Each item in "operations" must be one of:
 - {"op": "insert_toc", "after_block_id": "<id>"}
 - {"op": "bold_span", "block_id": "<id>", "start": <int>, "end": <int>}
 
-Respond with ONLY that JSON object. No prose, no markdown fences, no preamble.
-Reference blocks only by ids that appear in the blueprint — never invent one."""
+Output EXACTLY ONE JSON object and nothing else — no prose, no markdown
+fences, no preamble, no explanation, no second object, no trailing text
+of any kind after the closing brace."""
 
 
 def _call_gemini(prompt: str) -> str:
@@ -47,8 +48,9 @@ def plan(instruction: str, blueprint: list[dict]) -> str:
 def plan_and_validate(instruction: str, blueprint: list[dict]) -> list:
     raw = plan(instruction, blueprint)
     try:
-        return OperationList.model_validate_json(raw).operations
-    except ValidationError as e:
+        cleaned = _extract_json_object(raw)
+        return OperationList.model_validate_json(cleaned).operations
+    except (ValidationError, json.JSONDecodeError) as e:
         retry_prompt = (
             f"Instruction: {instruction}\n\nBlueprint:\n{json.dumps(blueprint)}\n\n"
             f"Your previous response failed validation with this error:\n{e}\n"
@@ -56,6 +58,13 @@ def plan_and_validate(instruction: str, blueprint: list[dict]) -> list:
         )
         raw2 = _call_gemini(retry_prompt)
         try:
-            return OperationList.model_validate_json(raw2).operations
-        except ValidationError as e2:
+            cleaned2 = _extract_json_object(raw2)
+            return OperationList.model_validate_json(cleaned2).operations
+        except (ValidationError, json.JSONDecodeError) as e2:
             raise ValueError(f"Planner failed validation twice: {e2}") from e2
+        
+def _extract_json_object(raw: str) -> str:
+    decoder = json.JSONDecoder()
+    raw = raw.strip()
+    obj, _ = decoder.raw_decode(raw)  # parses first JSON value, ignores trailing junk
+    return json.dumps(obj)
